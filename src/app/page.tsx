@@ -6,7 +6,7 @@ export default function Home() {
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <ConnectButton />
       </div>
-      <h1>Hi</h1>
+      <h1>Welcome to TSender</h1>
     </main>
   );
 }

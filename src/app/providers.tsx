@@ -12,11 +12,9 @@ import "@rainbow-me/rainbowkit/styles.css";
 const queryClient = new QueryClient();
 
 export function Providers({ children }: { children: React.ReactNode }) {
+    
   const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => {setMounted(true);}, []);
 
   return (
     <WagmiProvider config={config}>
