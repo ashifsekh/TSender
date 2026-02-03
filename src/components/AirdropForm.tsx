@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import InputField from "./ui/InputField";
 import { chainsToTSender, erc20Abi } from "../constants";
 import { useChainId, useConfig, useAccount } from "wagmi";
@@ -14,6 +14,9 @@ export default function AirdropForm() {
   const account = useAccount();
   const chainId = useChainId();
   const config = useConfig(); // Required for core actions like readContract
+
+  const totalAmountNeeded = useMemo(() => {
+    return calculateTotal(amounts);}, [amounts]);
 
   async function getApprovedAmount(
     tSenderAddress: `0x${string}`,
@@ -48,6 +51,15 @@ export default function AirdropForm() {
     const tSenderConfig = chainsToTSender[chainId];
     console.log("Current chainId:", chainId);
     console.log("TSender Config:", tSenderConfig);
+
+    const tSenderAddress = chainsToTSender[chainId]?.tsender;
+    const approvedAmount = await getApprovedAmount(tSenderAddress);
+    console.log("Approved Amount:", approvedAmount.toString());
+
+    if (approvedAmount < totalAmountNeeded) {
+    }
+    else {
+    }
 
     if (!account.address) {
       alert("Please connect your wallet.");
