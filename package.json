@@ -7,7 +7,8 @@
     "start": "next start",
     "lint": "eslint",
     "anvil": "anvil --load-state tsender-deployed.json",
-    "dev": "next dev --turbo"
+    "dev": "next dev --turbo",
+    "test:unit": "vitest"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.10",
@@ -27,7 +28,10 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^28.0.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.0.5",
+    "vitest": "^4.0.18"
   }
 }

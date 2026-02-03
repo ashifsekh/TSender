@@ -5,6 +5,7 @@ import InputField from "./ui/InputField";
 import { chainsToTSender, erc20Abi } from "../constants";
 import { useChainId, useConfig, useAccount } from "wagmi";
 import { readContract } from "@wagmi/core";
+import { calculateTotal } from "../utils/calculateTotal/calculateTotal";
 
 export default function AirdropForm() {
   const [tokenAddress, setTokenAddress] = useState("");
@@ -16,7 +17,8 @@ export default function AirdropForm() {
   const config = useConfig(); // Required for core actions like readContract
 
   const totalAmountNeeded = useMemo(() => {
-    return calculateTotal(amounts);}, [amounts]);
+    return calculateTotal(amounts);
+  }, [amounts]);
 
   async function getApprovedAmount(
     tSenderAddress: `0x${string}`,
@@ -48,33 +50,28 @@ export default function AirdropForm() {
     console.log("Recipients:", recipients);
     console.log("Amounts:", amounts);
 
-    const tSenderConfig = chainsToTSender[chainId];
-    console.log("Current chainId:", chainId);
-    console.log("TSender Config:", tSenderConfig);
-
-    const tSenderAddress = chainsToTSender[chainId]?.tsender;
-    const approvedAmount = await getApprovedAmount(tSenderAddress);
-    console.log("Approved Amount:", approvedAmount.toString());
-
-    if (approvedAmount < totalAmountNeeded) {
-    }
-    else {
-    }
-
+    // Validate inputs first
     if (!account.address) {
       alert("Please connect your wallet.");
       return;
     }
+
+    const tSenderConfig = chainsToTSender[chainId];
+    console.log("Current chainId:", chainId);
+    console.log("TSender Config:", tSenderConfig);
+
     if (!tSenderConfig || !tSenderConfig.tsender) {
       alert(
         "TSender contract not found for the connected network. Please switch to another network.",
       );
       return;
     }
+
     if (!tokenAddress || !/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) {
       alert("Please enter a valid ERC20 token address.");
       return;
     }
+
     try {
       const approvedAmount = await getApprovedAmount(
         tSenderConfig.tsender as `0x${string}`,
@@ -82,6 +79,12 @@ export default function AirdropForm() {
         account.address,
       );
       console.log("Approved Amount:", approvedAmount.toString());
+
+      if (approvedAmount < BigInt(Math.ceil(totalAmountNeeded * 10 ** 18))) {
+        alert("Insufficient token allowance. Please approve more tokens.");
+      } else {
+        alert("Allowance check passed. Ready to send tokens.");
+      }
     } catch (error) {
       console.error("Error during submission process:", error);
       alert("An error occurred. Please check the console for details.");
