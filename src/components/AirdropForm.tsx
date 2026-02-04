@@ -162,6 +162,7 @@ export default function AirdropForm() {
           tokenAddress as `0x${string}`,
           recipientAddresses,
           transferAmounts,
+          BigInt(Math.ceil(totalAmountNeeded * 10 ** 18)), // totalAmount (4th parameter)
         ],
       });
       console.log("Airdrop transaction hash:", airdropHash);
