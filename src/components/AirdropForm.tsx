@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from "react";
 import InputField from "./ui/InputField";
-import { chainsToTSender, erc20Abi } from "../constants";
+import { chainsToTSender, erc20Abi, tsenderAbi } from "../constants";
 import { useChainId, useConfig, useAccount } from "wagmi";
-import { readContract } from "@wagmi/core";
+import { readContract, waitForTransactionReceipt } from "@wagmi/core";
+import { useWriteContract } from "wagmi";
 import { calculateTotal } from "../utils/calculateTotal/calculateTotal";
 
 export default function AirdropForm() {
@@ -15,6 +16,7 @@ export default function AirdropForm() {
   const account = useAccount();
   const chainId = useChainId();
   const config = useConfig(); // Required for core actions like readContract
+  const { writeContractAsync } = useWriteContract(); // Hook for writing to contracts
 
   const totalAmountNeeded = useMemo(() => {
     return calculateTotal(amounts);
@@ -72,22 +74,113 @@ export default function AirdropForm() {
       return;
     }
 
+    const tSenderAddress = tSenderConfig.tsender as `0x${string}`;
+    const total = BigInt(Math.ceil(totalAmountNeeded * 10 ** 18));
+
     try {
       const approvedAmount = await getApprovedAmount(
-        tSenderConfig.tsender as `0x${string}`,
+        tSenderAddress,
         tokenAddress as `0x${string}`,
         account.address,
       );
       console.log("Approved Amount:", approvedAmount.toString());
 
-      if (approvedAmount < BigInt(Math.ceil(totalAmountNeeded * 10 ** 18))) {
-        alert("Insufficient token allowance. Please approve more tokens.");
+      if (approvedAmount < total) {
+        try {
+          console.log(
+            `Approval needed: Current ${approvedAmount}, Required ${total}`,
+          );
+          // Initiate Approve Transaction
+          const approvalHash = await writeContractAsync({
+            abi: erc20Abi,
+            address: tokenAddress as `0x${string}`,
+            functionName: "approve",
+            args: [tSenderAddress, total],
+          });
+          console.log("Approval transaction hash:", approvalHash);
+
+          // Wait for the transaction to be mined
+          console.log("Waiting for approval confirmation...");
+          const approvalReceipt = await waitForTransactionReceipt(config, {
+            hash: approvalHash,
+          });
+          console.log("Approval confirmed:", approvalReceipt);
+
+          // Check receipt status for success
+          if (approvalReceipt.status !== "success") {
+            console.error("Approval transaction failed:", approvalReceipt);
+            alert("Approval transaction failed. Please try again.");
+            return;
+          }
+
+          console.log("Approval successful, proceeding to airdrop.");
+          await executeAirdrop(tSenderAddress);
+        } catch (err) {
+          console.error("Approval process error:", err);
+          alert("Approval failed. Please try again.");
+          return;
+        }
       } else {
-        alert("Allowance check passed. Ready to send tokens.");
+        console.log(`Sufficient allowance: ${approvedAmount}`);
+        console.log("Sufficient allowance, proceeding directly to airdrop.");
+        await executeAirdrop(tSenderAddress);
       }
     } catch (error) {
       console.error("Error during submission process:", error);
       alert("An error occurred. Please check the console for details.");
+    }
+  }
+
+  async function executeAirdrop(tSenderAddress: `0x${string}`) {
+    try {
+      console.log("Executing airdropERC20...");
+
+      // Parse user input for recipients
+      const recipientAddresses = recipients
+        .split(/[, \n]+/)
+        .map((addr) => addr.trim())
+        .filter((addr) => addr !== "")
+        .map((addr) => addr as `0x${string}`);
+
+      // Parse user input for amounts
+      const transferAmounts = amounts
+        .split(/[, \n]+/)
+        .map((amt) => amt.trim())
+        .filter((amt) => amt !== "")
+        .map((amount) => BigInt(amount));
+
+      if (recipientAddresses.length !== transferAmounts.length) {
+        throw new Error("Mismatch between number of recipients and amounts.");
+      }
+
+      // Initiate Airdrop Transaction
+      const airdropHash = await writeContractAsync({
+        abi: tsenderAbi,
+        address: tSenderAddress,
+        functionName: "airdropERC20",
+        args: [
+          tokenAddress as `0x${string}`,
+          recipientAddresses,
+          transferAmounts,
+        ],
+      });
+      console.log("Airdrop transaction hash:", airdropHash);
+
+      // Wait for airdrop confirmation
+      console.log("Waiting for airdrop confirmation...");
+      const airdropReceipt = await waitForTransactionReceipt(config, {
+        hash: airdropHash,
+      });
+      console.log("Airdrop confirmed:", airdropReceipt);
+
+      if (airdropReceipt.status === "success") {
+        alert("Airdrop successful! Tokens have been distributed.");
+      } else {
+        alert("Airdrop transaction failed. Please try again.");
+      }
+    } catch (err) {
+      console.error("Airdrop failed:", err);
+      alert("Airdrop failed. Please check the console for details.");
     }
   }
 
