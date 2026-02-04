@@ -7,11 +7,15 @@ import { useChainId, useConfig, useAccount } from "wagmi";
 import { readContract, waitForTransactionReceipt } from "@wagmi/core";
 import { useWriteContract } from "wagmi";
 import { calculateTotal } from "../utils/calculateTotal/calculateTotal";
+import { CgSpinner } from "react-icons/cg";
 
 export default function AirdropForm() {
   const [tokenAddress, setTokenAddress] = useState("");
   const [recipients, setRecipients] = useState(""); // State for recipients
   const [amounts, setAmounts] = useState(""); // State for amounts
+  const [isConfirming, setIsConfirming] = useState(false); // Waiting for wallet confirmation
+  const [isMining, setIsMining] = useState(false); // Waiting for transaction to be mined
+  const [error, setError] = useState<string | null>(null); // Error message
 
   const account = useAccount();
   const chainId = useChainId();
@@ -52,9 +56,12 @@ export default function AirdropForm() {
     console.log("Recipients:", recipients);
     console.log("Amounts:", amounts);
 
+    // Reset error state
+    setError(null);
+
     // Validate inputs first
     if (!account.address) {
-      alert("Please connect your wallet.");
+      setError("Please connect your wallet.");
       return;
     }
 
@@ -63,14 +70,14 @@ export default function AirdropForm() {
     console.log("TSender Config:", tSenderConfig);
 
     if (!tSenderConfig || !tSenderConfig.tsender) {
-      alert(
+      setError(
         "TSender contract not found for the connected network. Please switch to another network.",
       );
       return;
     }
 
     if (!tokenAddress || !/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) {
-      alert("Please enter a valid ERC20 token address.");
+      setError("Please enter a valid ERC20 token address.");
       return;
     }
 
@@ -90,6 +97,10 @@ export default function AirdropForm() {
           console.log(
             `Approval needed: Current ${approvedAmount}, Required ${total}`,
           );
+
+          // Set confirming state before calling writeContractAsync
+          setIsConfirming(true);
+
           // Initiate Approve Transaction
           const approvalHash = await writeContractAsync({
             abi: erc20Abi,
@@ -98,6 +109,10 @@ export default function AirdropForm() {
             args: [tSenderAddress, total],
           });
           console.log("Approval transaction hash:", approvalHash);
+
+          // Switch to mining state
+          setIsConfirming(false);
+          setIsMining(true);
 
           // Wait for the transaction to be mined
           console.log("Waiting for approval confirmation...");
@@ -109,7 +124,8 @@ export default function AirdropForm() {
           // Check receipt status for success
           if (approvalReceipt.status !== "success") {
             console.error("Approval transaction failed:", approvalReceipt);
-            alert("Approval transaction failed. Please try again.");
+            setError("Approval transaction failed. Please try again.");
+            setIsMining(false);
             return;
           }
 
@@ -117,7 +133,9 @@ export default function AirdropForm() {
           await executeAirdrop(tSenderAddress);
         } catch (err) {
           console.error("Approval process error:", err);
-          alert("Approval failed. Please try again.");
+          setError("Approval failed. Please try again.");
+          setIsConfirming(false);
+          setIsMining(false);
           return;
         }
       } else {
@@ -127,7 +145,9 @@ export default function AirdropForm() {
       }
     } catch (error) {
       console.error("Error during submission process:", error);
-      alert("An error occurred. Please check the console for details.");
+      setError("An error occurred. Please check the console for details.");
+      setIsConfirming(false);
+      setIsMining(false);
     }
   }
 
@@ -159,6 +179,9 @@ export default function AirdropForm() {
         BigInt(0),
       );
 
+      // Set confirming state before calling writeContractAsync
+      setIsConfirming(true);
+
       // Initiate Airdrop Transaction
       const airdropHash = await writeContractAsync({
         abi: tsenderAbi,
@@ -173,6 +196,10 @@ export default function AirdropForm() {
       });
       console.log("Airdrop transaction hash:", airdropHash);
 
+      // Switch to mining state
+      setIsConfirming(false);
+      setIsMining(true);
+
       // Wait for airdrop confirmation
       console.log("Waiting for airdrop confirmation...");
       const airdropReceipt = await waitForTransactionReceipt(config, {
@@ -181,13 +208,18 @@ export default function AirdropForm() {
       console.log("Airdrop confirmed:", airdropReceipt);
 
       if (airdropReceipt.status === "success") {
+        setError(null);
         alert("Airdrop successful! Tokens have been distributed.");
       } else {
-        alert("Airdrop transaction failed. Please try again.");
+        setError("Airdrop transaction failed. Please try again.");
       }
+
+      setIsMining(false);
     } catch (err) {
       console.error("Airdrop failed:", err);
-      alert("Airdrop failed. Please check the console for details.");
+      setError("Airdrop failed. Please check the console for details.");
+      setIsConfirming(false);
+      setIsMining(false);
     }
   }
 
@@ -224,25 +256,51 @@ export default function AirdropForm() {
         large={true}
       />
 
+      {/* Error Message Display */}
+      {error && (
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-800 border border-red-200">
+          <p className="font-semibold">Error:</p>
+          <p>{error}</p>
+        </div>
+      )}
+
       <button
         type="submit"
+        disabled={isConfirming || isMining}
         className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200
-             hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:scale-95"
+             hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:scale-95 disabled:bg-gray-400 disabled:cursor-not-allowed"
       >
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
-          />
-        </svg>
-        Send Tokens
+        {/* Confirming State */}
+        {isConfirming ? (
+          <>
+            <CgSpinner className="h-4 w-4 animate-spin" />
+            Confirming in wallet...
+          </>
+        ) : /* Mining State */
+        isMining ? (
+          <>
+            <CgSpinner className="h-4 w-4 animate-spin" />
+            Mining transaction...
+          </>
+        ) : (
+          /* Default State */
+          <>
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
+              />
+            </svg>
+            Send Tokens
+          </>
+        )}
       </button>
     </form>
   );
