@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import InputField from "./ui/InputField";
 import { chainsToTSender, erc20Abi, tsenderAbi } from "../constants";
 import { useChainId, useConfig, useAccount } from "wagmi";
@@ -24,6 +24,32 @@ export default function AirdropForm() {
 
   const totalAmountNeeded = useMemo(() => {
     return calculateTotal(amounts);
+  }, [amounts]);
+
+  // Load data from local storage on component mount
+  useEffect(() => {
+    const savedTokenAddress = localStorage.getItem("airdrop_tokenAddress");
+    const savedRecipients = localStorage.getItem("airdrop_recipients");
+    const savedAmounts = localStorage.getItem("airdrop_amounts");
+
+    if (savedTokenAddress) setTokenAddress(savedTokenAddress);
+    if (savedRecipients) setRecipients(savedRecipients);
+    if (savedAmounts) setAmounts(savedAmounts);
+  }, []);
+
+  // Save token address to local storage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("airdrop_tokenAddress", tokenAddress);
+  }, [tokenAddress]);
+
+  // Save recipients to local storage whenever they change
+  useEffect(() => {
+    localStorage.setItem("airdrop_recipients", recipients);
+  }, [recipients]);
+
+  // Save amounts to local storage whenever they change
+  useEffect(() => {
+    localStorage.setItem("airdrop_amounts", amounts);
   }, [amounts]);
 
   async function getApprovedAmount(
