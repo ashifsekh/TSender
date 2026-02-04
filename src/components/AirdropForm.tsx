@@ -3,11 +3,12 @@
 import { useState, useMemo, useEffect } from "react";
 import InputField from "./ui/InputField";
 import { chainsToTSender, erc20Abi, tsenderAbi } from "../constants";
-import { useChainId, useConfig, useAccount } from "wagmi";
+import { useChainId, useConfig, useAccount, useReadContracts } from "wagmi";
 import { readContract, waitForTransactionReceipt } from "@wagmi/core";
 import { useWriteContract } from "wagmi";
 import { calculateTotal } from "../utils/calculateTotal/calculateTotal";
 import { CgSpinner } from "react-icons/cg";
+import { formatUnits } from "viem";
 
 export default function AirdropForm() {
   const [tokenAddress, setTokenAddress] = useState("");
@@ -51,6 +52,46 @@ export default function AirdropForm() {
   useEffect(() => {
     localStorage.setItem("airdrop_amounts", amounts);
   }, [amounts]);
+
+  // Validate token address format
+  const isValidTokenAddress = useMemo(() => {
+    return /^0x[a-fA-F0-9]{40}$/.test(tokenAddress);
+  }, [tokenAddress]);
+
+  // Batch read token name and decimals from the contract
+  const { data: tokenData } = useReadContracts({
+    contracts: [
+      {
+        address: tokenAddress as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "name",
+      },
+      {
+        address: tokenAddress as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "decimals",
+      },
+    ],
+    query: {
+      enabled: isValidTokenAddress, // Only fetch when address is valid
+    },
+  });
+
+  // Extract token name and decimals from the batch result
+  const tokenName = tokenData?.[0]?.result as string | undefined;
+  const tokenDecimals = tokenData?.[1]?.result as number | undefined;
+
+  // Calculate total amount in wei
+  const totalAmountWei = useMemo(() => {
+    if (!tokenDecimals) return BigInt(0);
+    return BigInt(Math.ceil(totalAmountNeeded * 10 ** tokenDecimals));
+  }, [totalAmountNeeded, tokenDecimals]);
+
+  // Format total amount in tokens (human-readable)
+  const totalAmountFormatted = useMemo(() => {
+    if (!tokenDecimals) return "0";
+    return formatUnits(totalAmountWei, tokenDecimals);
+  }, [totalAmountWei, tokenDecimals]);
 
   async function getApprovedAmount(
     tSenderAddress: `0x${string}`,
@@ -281,6 +322,43 @@ export default function AirdropForm() {
         onChange={(e) => setAmounts(e.target.value)}
         large={true}
       />
+
+      {/* Transaction Details Display */}
+      {isValidTokenAddress && (tokenName || tokenDecimals !== undefined) && (
+        <div className="mb-4 rounded-lg bg-blue-50 p-4 border border-blue-200">
+          <h3 className="text-sm font-semibold text-blue-900 mb-3">
+            Transaction Details
+          </h3>
+          <div className="space-y-2 text-sm">
+            {tokenName && (
+              <div className="flex justify-between">
+                <span className="text-blue-700 font-medium">Token Name:</span>
+                <span className="text-blue-900">{tokenName}</span>
+              </div>
+            )}
+            {tokenDecimals !== undefined && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-blue-700 font-medium">
+                    Total Amount (Wei):
+                  </span>
+                  <span className="text-blue-900 font-mono text-xs">
+                    {totalAmountWei.toString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-700 font-medium">
+                    Total Amount (Tokens):
+                  </span>
+                  <span className="text-blue-900 font-semibold">
+                    {totalAmountFormatted} {tokenName || "Tokens"}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Error Message Display */}
       {error && (
