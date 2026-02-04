@@ -142,16 +142,22 @@ export default function AirdropForm() {
         .filter((addr) => addr !== "")
         .map((addr) => addr as `0x${string}`);
 
-      // Parse user input for amounts
+      // Parse user input for amounts and convert to proper decimals (18 decimals for ERC20)
       const transferAmounts = amounts
         .split(/[, \n]+/)
         .map((amt) => amt.trim())
         .filter((amt) => amt !== "")
-        .map((amount) => BigInt(amount));
+        .map((amount) => BigInt(Math.ceil(parseFloat(amount) * 10 ** 18))); // Apply 18 decimal places
 
       if (recipientAddresses.length !== transferAmounts.length) {
         throw new Error("Mismatch between number of recipients and amounts.");
       }
+
+      // Calculate total from individual amounts to ensure consistency
+      const calculatedTotal = transferAmounts.reduce(
+        (sum, amount) => sum + amount,
+        BigInt(0),
+      );
 
       // Initiate Airdrop Transaction
       const airdropHash = await writeContractAsync({
@@ -162,7 +168,7 @@ export default function AirdropForm() {
           tokenAddress as `0x${string}`,
           recipientAddresses,
           transferAmounts,
-          BigInt(Math.ceil(totalAmountNeeded * 10 ** 18)), // totalAmount (4th parameter)
+          calculatedTotal, // Use calculated total from individual amounts
         ],
       });
       console.log("Airdrop transaction hash:", airdropHash);
