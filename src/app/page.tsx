@@ -1,5 +1,6 @@
 
 import  AirdropForm from "../components/AirdropForm";
+import Homecontant from "../components/HomeContant";
 
 export default function Home() {
   return (
@@ -7,7 +8,7 @@ export default function Home() {
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
       </div>
       <h1>Welcome to TSender</h1>
-      <AirdropForm />
+      <Homecontant />
     </main>
   );
 }
