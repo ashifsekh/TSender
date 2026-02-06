@@ -1,14 +1,25 @@
+"use client";
 
-import  AirdropForm from "../components/AirdropForm";
-import Homecontant from "../components/HomeContant";
+import HomeContent from "../components/HomeContant";
+import { useAccount } from "wagmi";
 
 export default function Home() {
+  const { isConnected } = useAccount();
   return (
     <main style={{ padding: "2rem" }}>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div>
+        {!isConnected ? (
+          <div> <h1>Please connect your wallet</h1></div>
+        ) : (
+          <>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}></div>
+            <div>
+              <h1>Welcome to TSender</h1>
+              <HomeContent />
+            </div>
+          </>
+        )}
       </div>
-      <h1>Welcome to TSender</h1>
-      <Homecontant />
     </main>
   );
 }
